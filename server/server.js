@@ -26,5 +26,7 @@ app.listen(5001,()=>{
     console.log('Server starting at port 5001 !!')
 })
 
+module.exports = {app};
+
 // let newUser = new User({email: 'amir.suhail@accenture.com'});
 // newUser.save().then((doc)=>{console.log('User Added!!')},(err)=>{console.log(`User can't be added!!`)});
