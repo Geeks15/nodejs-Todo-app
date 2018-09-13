@@ -4,24 +4,14 @@ const {ObjectID} = require ('mongodb');
 
 const {app} = require ('./../server');
 const {Todo} = require ('./../db/model/todos');
+const {todos,populateTodos,users,populateUsers} = require('./seed/seed');
 
-var todos = [{
-    _id: new ObjectID(),
-    text: 'Sample test Todo'
-},{
-    _id: new ObjectID(),
-    text: 'Sample test Todo',
-    completed: true,
-    completedAt: 333
-}];
+
 
 // ================================== will Run before tests are called ==================
 
-beforeEach((done) => {
-    Todo.remove({}).then(() => {
-        return Todo.insertMany(todos);
-    }).then(() => done());
-});
+beforeEach(populateUsers);
+beforeEach(populateTodos);
 
 
 // ================================== POST /todos test cases =============================
@@ -29,7 +19,7 @@ beforeEach((done) => {
 describe ('POST /todos', () => {
 
     it('should create a new todo', (done) => {
-
+        this.timeout(10000);
         var text = 'Test Todo';
         request(app)
         .post('/todos')
@@ -186,4 +176,24 @@ describe('PATCH /todos/:id',() => {
         })
         .end(done);
     });
+});
+
+
+describe('GET /users/me',() => {
+
+    it('should return authenticated user',(done) => {
+
+        request(app)
+        .get('/users/me')
+        .set('x-auth',users[0].tokens[0].token)
+        .expect(200)
+        .expect((res) => {
+
+            expect(res.body._id).toBe(users[0]._id.toHexString());
+            expect(res.body.email).toBe(users[0].email);
+        })
+        .end(done);
+
+    });
+
 });
