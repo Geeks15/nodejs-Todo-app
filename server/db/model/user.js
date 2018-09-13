@@ -61,6 +61,15 @@ let UserSchema = new mongoose.Schema({
         });
     };
 
+    UserSchema.methods.removeToken = function(token){
+
+       return this.update({
+            $pull:{
+                tokens:{token}
+            }
+        })
+    }
+
     UserSchema.statics.findByToken = function (token){
         let User = this;
         let decoded;
@@ -95,7 +104,25 @@ let UserSchema = new mongoose.Schema({
         }
         else
             next();
+    });
+
+    UserSchema.statics.findByCredentials = function(body){
+
+       return this.findOne({email:body.email}).then((user)=>{
+           if(!user)
+                return Promise.reject();
+
+            return new Promise((resolve,reject)=>{
+
+           bcrypt.compare(body.password,user.password,(err,res)=>{
+            if(res)
+                resolve(user);
+            else
+                reject();
+           })
+       })
     })
+}
     
 let User = mongoose.model('User',UserSchema);
 

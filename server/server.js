@@ -3,7 +3,8 @@ const bodyParser = require ('body-parser');
 const {ObjectID} = require ('mongodb');
 const _ = require ('lodash');
 
-const {mongoose} = require ('./db/mongoose');
+require('./config/config');
+const {mongoose} = require('./db/mongoose');
 const {User} = require ('./db/model/user');
 const {Todo} = require ('./db/model/todos');
 const {authenticate} = require('./middleware/express-middleware');
@@ -11,7 +12,7 @@ const {authenticate} = require('./middleware/express-middleware');
 
 // ========================= Express Middleware ================================
 
-var port = process.env.PORT || '5001'
+var port = process.env.PORT;
 var app = express();
 app.use(bodyParser.json());
 
@@ -19,8 +20,13 @@ app.use(bodyParser.json());
 
     // ===================== POST /todos =======================================
 
-app.post('/todos',(req,res) => {
-    let todo = new Todo(req.body);
+app.post('/todos',authenticate,(req,res) => {
+    
+    let todo = new Todo({
+        text:req.body.text,
+        _creator:req.user._id
+    });
+
     todo.save().then((doc) => {
         res.send(doc);
     },(err)=>{
@@ -31,9 +37,9 @@ app.post('/todos',(req,res) => {
 
     // ===================== GET /todos =======================================
 
-app.get('/todos',(req,res) => {
+app.get('/todos',authenticate,(req,res) => {
 
-    Todo.find().then((todos) => {
+    Todo.find({_creator:req.user._id}).then((todos) => {
 
         res.send(todos);
 
@@ -45,11 +51,14 @@ app.get('/todos',(req,res) => {
 
     // ===================== GET /todos/:id =======================================
 
-app.get('/todos/:id',(req,res) => {
+app.get('/todos/:id',authenticate,(req,res) => {
 
     if(!ObjectID.isValid(req.params.id))
         return res.status(404).send();
-    Todo.findById(req.params.id).then((todo) => {
+    Todo.findOne({
+        _id:req.params.id,
+        _creator:req.user._id
+    }).then((todo) => {
 
         if(!todo)
             return res.status(404).send()
@@ -60,12 +69,15 @@ app.get('/todos/:id',(req,res) => {
 
     // ===================== DELETE /todos/:id =======================================
 
-app.delete('/todos/:id',(req,res) => {
+app.delete('/todos/:id',authenticate,(req,res) => {
 
     if(!ObjectID.isValid(req.params.id))
         return res.status(404).send();
 
-    Todo.findByIdAndRemove(req.params.id).then((todo) => {
+    Todo.findOneAndRemove({
+        _id:req.params.id,
+        _creator:req.user._id
+    }).then((todo) => {
 
         if(!todo)
             return res.status(404).send();
@@ -76,7 +88,7 @@ app.delete('/todos/:id',(req,res) => {
 
     // ===================== PATCH /todos/:id =======================================
 
-app.patch('/todos/:id',(req,res) => {
+app.patch('/todos/:id',authenticate,(req,res) => {
 
 
     let id = req.params.id;
@@ -92,7 +104,7 @@ app.patch('/todos/:id',(req,res) => {
         body.completed = false;
     }
 
-    Todo.findByIdAndUpdate(id,{$set:body},{new:true}).then((todo) => {
+    Todo.findOneAndUpdate({_id:id,_creator:req.user._id},{$set:body},{new:true}).then((todo) => {
        
         if(!todo)
             return res.status(404).send();
@@ -121,6 +133,32 @@ app.get('/users/me',authenticate,(req,res) => {
     res.send(req.user);
 
 });
+
+    // ===================== POST /users/login =======================================
+
+app.post('/users/login',(req,res) => {
+
+    let body = _.pick(req.body,['email','password']);
+
+    User.findByCredentials(body).then((user) => {
+        return user.generateAuthToken().then((token) => {
+            res.header('x-auth',token).send(user.toJSON());
+        });
+        
+    }).catch((err)=> res.status(400).send())
+    
+});
+
+    // ===================== DELETE /users/me/token =======================================
+
+app.delete('/users/me/token',authenticate,(req,res) => {
+
+    req.user.removeToken(req.token).then(()=>{
+        res.send();
+    },(err)=>{
+        res.satus(400).send();
+    })
+})
 
 // ========================= STARTING SERVER ON PORT 5001 =======================================
 
